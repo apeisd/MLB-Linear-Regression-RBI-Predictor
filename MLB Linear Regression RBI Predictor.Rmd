@@ -1,0 +1,292 @@
+---
+title: "Final Report Group 13"
+author: "Jeric Pascua, Harjas Dhaliwal, Jorel Diesta, Thien Pham"
+date: "12/7/2023"
+output:
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(leaps)
+library(car)
+library(dplyr)
+library("GGally")
+library("gridExtra")
+library("ggplot2") 
+library(mltools)
+library(data.table)
+
+mlb <- read.csv("mlb2023.csv", header = T)
+mlb <- mlb[-766, ]
+mlb_filtered <- mlb %>% 
+  filter(PA > 30) %>%
+  select(-Name, -Name.additional, -Tm, -Lg, -Pos.Summary, -TB)
+mlb_filtered$sqrt_RBI <- sqrt(mlb_filtered$RBI)
+```
+\tableofcontents 
+\newpage
+
+# Introduction
+
+## Research Question
+
+Our research question we sought to answer was what hitting statistics can be attributed to a players RBI (runs batted in) count for a given season. This question is of interest to us because we believe that RBI is a strong indicator of a players offensive value. The motivation behind this belief is that since runs scored ultimately leads to teams winning games, a player able to hit a ball in play that allows runners on base to reach home plate seems to be a good indicator that their hitting ability is valuable to their team. Out of all offense statistics available we believed that RBI seemed to be among the most meaningful when it came to measuring a players offensive value. 
+
+## Data and Key Variables
+
+The data we used to answer our research question was the MLB player hitting statistics dataset. This dataset contains the hitting statistics of all players that made a plate appearance in the 2023 season. For our research we decided it would be beneficial to clean the data and we did so by only including players that had at least 30 plate appearances that way we would only consider players with a decent sample size. This was done so we could get a better picture of offensive player performance and to account for players that didn't get to bat as frequently for any reason such as injury or being demoted from the roster. There are 31 different variables in this dataset including our response variable, RBI, that we investigated for our research. 
+
+Key variables from the dataset that we used in our final regression model as predictor variables include: 
+
+* G (games played) - games played in the season
+* HR (home runs hit) - balls hit outside of the park within fair territory
+* X2B (doubles hit) - base hits where the batter reaches second base
+* BB (walks) - times a player reached first base as a result of 4 balls being pitched outside the strikezone
+* SF (sacrifice fly) - balls hit that results in the batter to be out but a run is scored
+* GDP (grounded into double play) - balls hit that resulted in two outs
+* HBP (hit by pitch) - times a player is granted a free walk to first as result of being struck by a pitch 
+
+## Exploratory Data Analysis and Summary of Data
+
+```{r fig.align='center', fig.cap="EDA: Response vs. Predictor", echo=FALSE, fig.width=7, fig.height=3}
+y <- mlb_filtered$RBI
+x1 <- mlb_filtered$G
+x2 <- mlb_filtered$HR
+x3 <- mlb_filtered$X2B
+x4 <- mlb_filtered$BB
+x5 <- mlb_filtered$SF
+x6 <- mlb_filtered$GDP
+x7 <- mlb_filtered$HBP
+
+s1<-ggplot(mlb_filtered, aes(x=x1, y=y)) + geom_point() + xlab('G') + ylab('RBI')
+s2<-ggplot(mlb_filtered, aes(x=x2, y=y)) + geom_point() + xlab('HR') + ylab('RBI')
+s3<-ggplot(mlb_filtered, aes(x=x3, y=y)) + geom_point() + xlab('X2B') + ylab('RBI')
+s4<-ggplot(mlb_filtered, aes(x=x4, y=y)) + geom_point() + xlab('BB') + ylab('RBI')
+grid.arrange(s1,s2,s3,s4, ncol = 2, nrow = 2)
+
+s5<-ggplot(mlb_filtered, aes(x=x5, y=y)) + geom_point() + xlab('SF') + ylab('RBI')
+s6<-ggplot(mlb_filtered, aes(x=x6, y=y)) + geom_point() + xlab('GDP') + ylab('RBI')
+s7<-ggplot(mlb_filtered, aes(x=x7, y=y)) + geom_point() + xlab('HBP') + ylab('RBI')
+grid.arrange(s5, s6, s7, ncol = 2, nrow = 2)
+```
+
+\begin{table}
+\begin{center}
+\begin{tabular}{|c|c|c|c|c|c|}
+\hline 
+Variable & Type & Min & Max & Mean & SD\\
+\hline 
+RBI & Num Disc & 0 & 139 & 36.83 & 28.87\\
+\hline 
+G & Num Disc & 7 & 162 & 86.07 & 46.61\\
+HR & Num Disc & 0 & 54 & 10.06 & 9.73\\
+X2B & Num Disc & 0 & 59 & 14.08 & 10.86\\
+BB & Num Disc & 0 & 132 & 27.04 & 22.53\\
+SF & Num Disc & 0 & 12 & 2.10 & 2.14\\
+GDP & Num Disc & 0 & 30 & 5.93 & 5.27\\
+HBP & Num Disc & 0 & 34 & 3.60 & 4.07\\
+\hline 
+\end{tabular}
+\end{center}
+\caption{Data Summary Statistics}
+\end{table}
+
+
+# Regression Analysis
+
+## Final Model
+
+After performing nested F-tests, we arrive at our final model: $$Y = \beta_0 + \beta_1 X_1 + \beta_2 X_2 + \beta_3 X_3 + \beta_4 X_4 + \beta_5 X_5 + \beta_6 X_6 + \beta_7 X_1 X_2+ \beta_8 X_1 X_3 + \epsilon$$
+
+$Y= \sqrt{RBI}$
+
+$X_1 = G$
+
+$X_2 = HR$
+
+$X_3 = X2B$
+
+$X_4 = BB$
+
+$X_5 = SF$
+
+$X_6 = GDP$
+
+$X_7 = HBP$
+
+Assumptions of $\epsilon$
+
+* $\epsilon \sim N(0, \sigma^2)$
+* Constant Variance $\sigma\neq \sigma(X)$
+
+### Model Selection
+
+When beginning to work our way down, we started with a full model, with all variables, interactions and second order terms. We were able to break this down by determining that the many of the second order terms and all quadratic terms from the initial full model were insignificant and could be dropped.
+
+### Interactions considered
+
+In our first model, we considered interactions between all of the variables given in our initial model, which would be: Games Played, Home Runs, Doubles Hit, Walks, Sacrifice Flies, Grounded Into Double Play, Hit By Pitch. When attempting to drop variables, we attempted to drop all interaction terms containing Games Played (G), Walks (BB) and Hit by Pitch (HBP). However, this didn't result in a better predictor, so had to individually drop groups of interaction terms, starting with all interaction terms with Walks (BB), then Hit by Pitch (HBP), then Ground Into Double Play (GDP), then finally Sacrifice Flies (SF). We also found that the interaction between Home Runs and Doubles Hit as well as the interaction between Games and Double Hit were not significant. This left us with our final model given above.
+
+### Variable Transformations
+
+Our initial first order model of $Y = \beta_0 + \beta_1 X_1 + \beta_2 X_2 + \beta_3 X_3 + \beta_4 X_4 + \beta_5 X_5 + \beta_6 X_6 +\epsilon$ failed a few assumptions that must be satisfied in order to perform regression analysis. The assumptions that were not met were the assumptions of Constant Variance and Normality. One of the easiest fixes would be to transform our data. Square rooting our data is the typical "fix" for making sure the Constant Variance assumption is satisfied, as well as satisfying the Normality Assumption. With this transformation of $RBI$, we were able to satisfy all of the assumptions necessary to conduct our analysis.
+
+## Model Assumptions
+
+Our model assumes that the relationship between RBI and its predictors are linear. It also assumes that the errors, our residuals, are independent and come from a normal distribution, and that its variance is constant.
+
+## Model Diagnostics
+
+In our final model, we checked to make sure that the all our assumptions were met. Many of the graphs will be shown in the Appendix below. We can see in Figure 2.1 that our assumption of Linearity is satisfied due to the relatively straight horizontal line along the "x-axis" or when our residuals equal 0. In Figure 2.2, the line is also relatively straight, satisfying our constant variance assumption. To further reinforce this, Figure 2.2 also contains our Non-constant Variance Score Test, resulting in a small p-value, and thus, we are unable to reject our null hypothesis and our constant variance assumption is once again satisfied. Normality is satisfied with our use of plots and the Shapiro-Wilks Test found in Figure 2.3. The plots follow their respective "normal" lines, and the Shapiro-Wilks Test gives us a p-value larger than our $\alpha = 0.01$, meaning our model satisfies the normal assumption. Finally, in Figure 2.4, we see our assumption for Independence is satisfied with the Durbin Watson Test, which also results in a p-value larger than our $\alpha = 0.01$. Hence, all of our assumptions are satisfied.
+
+## Model Fit Statistics
+
+Our final model gave us an Adjusted $R^2$ value of 0.9499 which can be seen in Figure 2.5. This means that with the variables that consist in our final model, roughly 95% of the variance of Runs Batted In could be explained by the variables in our final model. Our large F-statistic and small p-value further also found in Figure 2.5 reinforce that our final model is "good". This means that our model is significant and we can reject the null hypothesis, and accept that all of our variables in our final model help predict Runs Batted In.
+
+# Conclusion
+
+# Limitations
+
+Our model is limited only to the 2023 Major League Baseball(MLB) season; it cannot be used to predict past or future seasons of the MLB. Our model's high adjusted $R^2$ value of .9499 along with the use of multiple predictors could indicate that our model is over-fitted, and would fail to generalize the true pattern of our response variable, RBI. We also had to remove 218 rows due to missing data. This could have negatively impacted our ability to fully capture the pattern of the relationship between our response variable and its predictors. We could possibly run our model on the 218 missing rows, however, the generalization capabilities of our model is very poor, which makes it a poor choice for us to run our model to predict the 218 missing rows. We were also limited by Linear Regression. The square root transformation applied to our response variable was only able to make it a plateau-shaped distribution, rather than normal. The transformation that best normalized our response variable was the log-odds transformation: $\log\left(\frac{1-Y}{Y}\right)$. After performing this transforming, we can interpret our response variable as the log-odds of a player achieving an RBI, and the best players would be the ones with the highest percentages. Because of the effectiveness of this transformation, logistics regression would have been a better choice for our model.
+
+# Appendix
+
+## Figures
+
+### Figure 2.1
+
+```{r, echo=FALSE}
+# Linearity assumption
+model8 <- lm(sqrt_RBI ~ G + HR + X2B + BB + SF + GDP + HBP + 
+               G*HR + G*X2B, data = mlb_filtered)
+final = model8
+plot(final, 1)
+```
+
+### Figure 2.2
+
+```{r}
+# Constant Variance assumption
+plot(final, 3)
+ncvTest(final)
+```
+
+### Figure 2.3
+
+```{r}
+# Normality assumption
+qqnorm(final$residuals)
+qqline(final$residuals)
+shapiro.test(final$residuals)
+```
+
+### Figure 2.4
+
+```{r}
+# Independence assumption
+durbinWatsonTest(final)
+```
+
+### Figure 2.5
+
+```{r}
+# summary of final model (model 8)
+summary(model8)
+```
+
+### Nested F-Test
+
+Model 1: both interactions and second order terms
+
+Model 2: drops all second order terms from model 1
+
+```{r}
+model1 <- lm(sqrt_RBI ~ G + HR + X2B + BB + SF + GDP + HBP + 
+               I(G^2) + I(HR^2) + I(X2B^2) + I(BB^2) + I(SF^2) + I(GDP^2) + I(HBP^2) +
+               G*HR + G*X2B + G*BB + G*SF + G*GDP + G*HBP +
+               HR*X2B + HR*BB + HR*SF + HR*GDP + HR*HBP +
+               X2B*BB + X2B*SF + X2B*GDP + X2B*HBP + BB*SF + 
+               BB*GDP + BB*HBP + SF*GDP + SF*HBP + GDP*HBP, data = mlb_filtered)
+model2 <- lm(sqrt_RBI ~ G + HR + X2B + BB + SF + GDP + HBP + 
+               G*HR + G*X2B + G*BB + G*SF + G*GDP + G*HBP +
+               HR*X2B + HR*BB + HR*SF + HR*GDP + HR*HBP +
+               X2B*BB + X2B*SF + X2B*GDP + X2B*HBP + BB*SF + 
+               BB*GDP + BB*HBP + SF*GDP + SF*HBP + GDP*HBP, data = mlb_filtered)
+
+anova(model1, model2)
+```
+
+Model 3: similar to model 2 drops interaction terms containing G, BB, and HBP
+
+```{r}
+model3 <- lm(sqrt_RBI ~ G + HR + X2B + BB + SF + GDP + HBP + 
+               HR*X2B + HR*SF + HR*GDP + 
+               X2B*SF + X2B*GDP +  
+               SF*GDP, data = mlb_filtered)
+anova(model2, model3)
+```
+
+Model 4: similar to model 2 drops interaction terms containing BB
+
+```{r}
+model4 <- lm(sqrt_RBI ~ G + HR + X2B + BB + SF + GDP + HBP + 
+               G*HR + G*X2B + G*SF + G*GDP + G*HBP +
+               HR*X2B + HR*SF + HR*GDP + HR*HBP +
+               X2B*SF + X2B*GDP + X2B*HBP + 
+               SF*GDP + SF*HBP + GDP*HBP, data = mlb_filtered)
+
+anova(model2, model4)
+```
+
+Model 5: similar to model 4 drops interaction terms with HBP
+
+```{r}
+model5 <- lm(sqrt_RBI ~ G + HR + X2B + BB + SF + GDP + HBP + 
+               G*HR + G*X2B + G*SF + G*GDP +
+               HR*X2B + HR*SF + HR*GDP +
+               X2B*SF + X2B*GDP +
+               SF*GDP, data = mlb_filtered)
+
+anova(model4, model5)
+```
+
+Model 6: similar to model 5 drops interaction terms with GDP
+
+```{r}
+model6 <- lm(sqrt_RBI ~ G + HR + X2B + BB + SF + GDP + HBP + 
+               G*HR + G*X2B + G*SF + 
+               HR*X2B + HR*SF + 
+               X2B*SF, data = mlb_filtered)
+
+anova(model5, model6)
+```
+
+Model 7: similar to model 6 drops interaction terms with SF
+
+```{r}
+model7 <- lm(sqrt_RBI ~ G + HR + X2B + BB + SF + GDP + HBP + 
+               G*HR + G*X2B +
+               HR*X2B, data = mlb_filtered)
+
+anova(model6, model7)
+```
+
+Model 8: similar model 7 drops HR:X2B
+
+```{r}
+model8 <- lm(sqrt_RBI ~ G + HR + X2B + BB + SF + GDP + HBP + 
+               G*HR + G*X2B, data = mlb_filtered)
+
+anova(model7, model8)
+```
+
+Model 9: drops G:X2B
+
+```{r}
+model9 <- lm(sqrt_RBI ~ G + HR + X2B + BB + SF + GDP + HBP + 
+               G*HR, data = mlb_filtered)
+
+anova(model8, model9)
+```
+
